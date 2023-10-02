@@ -3,7 +3,7 @@ A classe VidaController atua como uma interface de comunicação para a tabela d
 
 Tipo   URL                               Body   Funcao
 
-POST   http://localhost:8080/vida/       Sim    Store
-GET    http://localhost:8080/vida/"CPF"  Nao    Show
-PUT    http://localhost:8080/vida/"CPF"  Sim    Update
-DELETE http://localhost:8080/vida/"CPF"  Nao    Destroy
+POST   http://localhost:8080/vida/       Sim    Store                                                                                       
+GET    http://localhost:8080/vida/"CPF"  Nao    Show                                                                                        
+PUT    http://localhost:8080/vida/"CPF"  Sim    Update                                                                                      
+DELETE http://localhost:8080/vida/"CPF"  Nao    Destroy                                                                                                                                                                             
