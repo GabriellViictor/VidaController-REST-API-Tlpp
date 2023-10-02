@@ -1,0 +1,298 @@
+#INCLUDE "tlpp-core.th"
+#INCLUDE "tlpp-rest.th"
+
+/*/{Protheus.doc} VidaController 
+Classe REST para manipular a entidade Vida(BTS) do PLS
+
+@type class
+@version 1.0
+@author Gabriel Victor Garcia Teixeira
+@since 26/09/2023
+/*/
+Class VidaController 
+    Public Method new()
+
+    @Post("/vida")
+    Public Method Store()
+
+    @Get("/vida/:cKey")
+    Public Method Show()
+
+    @Put("/vida/:cKey")
+    Public Method Update()
+
+    @Delete("/vida/:cKey")
+    Public Method Destroy()
+
+    Private Method ValidChave(aKeys,jBody)
+EndClass 
+
+
+/*/{Protheus.doc} VidaController::New
+Metodo construtor da classe
+
+@type method
+@author Gabriel Victor Garcia Teixeira
+@since 25/09/2023
+@version 1.0
+
+@return object, self
+/*/
+Method New() Class VidaController
+Return self
+
+
+/*/{Protheus.doc} VidaController::Store
+Metodo store REST
+
+@type method
+@author Gabriel V. Garcia Teixeira
+@since 25/09/2023
+@version 1.0
+
+@return object, Instancia da classe 
+/*/
+Method Store() Class VidaController
+    Local aArea := GetArea() As Array
+    Local cBody := "" As Character
+    Local cCod As Character
+    Local aKeys As Array
+    Local aArray As Array 
+
+    cBody := oRest:getBodyRequest()
+
+    If Empty(cBody)
+        oRest:setStatusCode(400)
+    Else
+        jBody := JsonObject():New()
+        jBody:fromJson(cBody)
+
+        aKeys := {"nome", "nomeCart", "dataNasc", "sexo", "estadoCivil", "numCartNacional", "cpf"}
+
+        aArray := jBody:GetNames()
+        
+        If Len(aArray) = Len(aKeys)
+
+            If ValidChave(aKeys,jBody)
+
+                BTS->(DbSetOrder(3)) // BTS_FILIAL + BTS_CPFUSR 
+
+                If ! BTS->(DbSeek(xFilial("BTS") + jBody["cpf"]))
+
+                    cCod:= GetSX8Num("BTS", "BTS_MATVID")
+                    ConfirmSX8()
+
+                    BTS->(RecLock("BTS", .t.))
+                    BTS->BTS_MATVID := cCod
+                    BTS->BTS_NOMUSR := jBody["nome"]   
+                    BTS->BTS_NOMCAR := jBody["nomeCart"]   
+                    BTS->BTS_DATNAS := StoD(jBody["dataNasc"])   
+                    BTS->BTS_SEXO   := jBody["sexo"]   
+                    BTS->BTS_ESTCIV := jBody["estadoCivil"]   
+                    BTS->BTS_NRCRNA := jBody["numCartNacional"]   
+                    BTS->BTS_CPFUSR := jBody["cpf"]   
+                    BTS->(MsUnlock())
+
+                    oRest:setResponse({"status": .t., "mensagem": "Vida cadastrado com sucesso"})
+                Else
+                    oRest:setResponse({"status": .f., "mensagem": "Vida ja cadastrado"})
+                EndIf
+            Else
+                oRest:setResponse({"status": .f., "mensagem": "Chave Vazia"})
+            EndIf
+        Else
+            oRest:setResponse({"status": .f., "mensagem": "Campos Obrigatorios faltando"})
+            oRest:setStatusCode(400)
+        EndIf
+    EndIf
+
+    RestArea(aArea)
+Return .t.
+
+
+/*/{Protheus.doc} VidaController::Show
+Metodo Show REST
+
+@type method
+@author Gabriel V. Garcia Teixeira
+@since 25/09/2023
+@version 1.0
+
+@return Logical, indicando se concluiu ou nÃ£o com sucesso 
+/*/
+Method Show() Class VidaController
+    Local aArea := GetArea()
+    Local jPath := JsonObject():New()
+    Local aObjProd
+    Local jObjProd 
+
+    jPath := oRest:getPathParamsRequest()
+    cCPF := jPath["cKey"]
+
+    If Cgc(cCPF)
+        BTS->(DbSetOrder(3)) // BTS_FILIAL + BTS_CPFUSR 
+
+        If BTS->(DbSeek(xFilial("BTS") + cCPF))
+            aObjProd := {}
+            aAdd( aObjProd,  JsonObject():New()) 
+
+            aObjProd[1]["matricula"]       := Alltrim(BTS->BTS_MATVID)
+            aObjProd[1]["nome"]            := Alltrim(BTS->BTS_NOMUSR)
+            aObjProd[1]["nomeCart"]        := Alltrim(BTS->BTS_NOMCAR)
+            aObjProd[1]["dataNasc"]        := Alltrim(DtoS(BTS->BTS_DATNAS))
+            aObjProd[1]["sexo"]            := Alltrim(BTS->BTS_SEXO)
+            aObjProd[1]["estadoCivil"]     := Alltrim(BTS->BTS_ESTCIV)
+            aObjProd[1]["numCartNacional"] := Alltrim(BTS->BTS_NRCRNA)
+            aObjProd[1]["cpf"]             := Alltrim(BTS->BTS_CPFUSR)
+
+            jObjProd :=  JsonObject():New()
+            jObjProd["Vida"] := aObjProd
+            
+            oRest:setResponse({"status": .t., "mensagem": jObjProd})
+        Else 
+            oRest:setResponse({"status": .f., "mensagem": "Usuario nao encontrado"})
+            oRest:setStatusCode(401)
+        EndIf
+    Else
+        oRest:setResponse({"status": .f., "mensagem": "CPF invalido"})
+    EndIf
+
+    RestArea(aArea)
+Return .t.
+
+
+
+/*/{Protheus.doc} Update
+Metodo Update REST    
+
+@type method
+@author Gabriel V. Garcia Teixeira
+@since 25/09/2023
+@version 1.0
+
+@return Logical, Indica se o metodo foi executado sem erros
+
+/*/
+Method Update() Class VidaController
+    Local aArea := GetArea()
+    Local cBody := ""
+    Local aKeys
+    Local cCPF := ""
+    Local jPath
+
+    jPath := oRest:getPathParamsRequest()
+    cCPF := jPath["cKey"]
+
+    cBody := oRest:getBodyRequest()
+
+    If Cgc(cCPF)
+        If ! Empty(cBody)
+            jBody := JsonObject():New()
+            jBody:fromJson(cBody)
+
+            aKeys := {"nome", "nomeCart", "dataNasc", "sexo", "estadoCivil", "numCartNacional"} 
+            
+            If ValidChave(aKeys,jBody)
+
+                BTS->(DbSetOrder(3)) // BTS_FILIAL + BTS_CPFUSR 
+
+                If BTS->(DbSeek(xFilial("BTS") + cCPF))
+
+                    BTS->(RecLock("BTS", .F.))
+                    BTS->BTS_NOMUSR := jBody["nome"]   
+                    BTS->BTS_NOMCAR := jBody["nomeCart"]   
+                    BTS->BTS_DATNAS := StoD(jBody["dataNasc"])   
+                    BTS->BTS_SEXO   := jBody["sexo"]   
+                    BTS->BTS_ESTCIV := jBody["estadoCivil"]   
+                    BTS->BTS_NRCRNA := jBody["numCartNacional"]   
+                    BTS->(MsUnlock())
+
+                    oRest:setResponse(jBody) 
+                EndIf
+            Else 
+                oRest:setResponse({"status": .f., "mensagem": "Chave Vazia"})
+            EndIf
+        Else
+            oRest:setStatusCode(401)
+        EndIf
+    Else 
+        oRest:setResponse({"status": .f., "mensagem": "CPF IVALIDO"})
+    EndIf
+
+    RestArea(aArea)
+Return .T.
+
+
+/*/{Protheus.doc} Destroy
+Metodo Destroy REST    
+
+@type method
+@author Gabriel V. Garcia Teixeira
+@since 25/09/2023
+@version 1.0
+
+@return Logical, Indica que o metodo foi executado com sucesso
+/*/
+Method Destroy() Class VidaController
+    Local aArea := GetArea()
+    Local cCPF := ""
+ 
+    jPath := oRest:getPathParamsRequest()
+    cCPF := jPath['cKey']
+
+    If Cgc(cCPF)
+        BTS->(DbSetOrder(3)) // BTS_FILIAL + BTS_CPFUSR 
+        If BTS->(DbSeek(xFilial("BTS") + cCPF))
+                
+            BTS->(RecLock("BTS", .f.))
+            BTS->(DBDELETE())
+            BTS->(MsUnlock())
+            BTS->(DBCloseArea())
+            
+            oRest:setResponse(200)
+        Else
+            oRest:setResponse(404)
+        EndIf
+    Else
+        oRest:setResponse({"status": .f., "mensagem": "CPF inválido"})
+    EndIf
+
+    RestArea(aArea)
+Return .t.
+
+
+/*/{Protheus.doc} ValidChave
+Método para validar o conteudo da chave Json
+
+@type method
+@author Gabriel Victor Garcia Teixeira
+@since 29/09/2023
+@version 1.0
+@param aKeys, Array, Vetor de chaves para consultar os dados atráves do json
+@param jBody, Json, JSON com os dados recebidos no body da requisição
+
+@return Logical, Indica que o metodo foi executado com sucesso
+    /*/
+Method ValidChave(aKeys, jBody) Class VidaController
+    Local nRet 
+    Local lLogical := .t.
+
+    For nRet := 1 to Len(aKeys)   
+        If Empty(jBody:GetJsonText(aKeys[nRet]))
+            oRest:setStatusCode(400)
+            lLogical := .f.
+        Endif
+    next 
+
+Return lLogical 
+
+
+
+
+
+
+
+
+
+
+
